@@ -35,10 +35,11 @@ async def health():
 @app.get("/api/providers")
 async def providers():
     return {"data_provider":settings.data_provider,"ai_provider":settings.ai_provider,"providers":[
-        {"id":"demo","label":"Demo sintetica","limits":"Solo test UI, dati fittizi marcati demo"},
-        {"id":"openfootball","label":"OpenFootball CC0","limits":"Calendari e risultati; copertura/aggiornamento non universali; niente quote live"},
-        {"id":"football_data_org","label":"Football-Data.org","limits":"Free: 12 competizioni, dati ritardati, attribuzione richiesta"},
-        {"id":"api_football","label":"API-Football","limits":"Free: 100 richieste/giorno indicati; verificare diritti di pubblicazione"}
+        {"id":"openfootball_remote","label":"OpenFootball pubblico CC0","limits":"8 competizioni della stagione 2026/27; calendari e risultati pubblicati; non live; nessuna quota, xG, formazione o infortunio"},
+        {"id":"openfootball","label":"OpenFootball locale","limits":"Dataset sincronizzati manualmente in backend/data; copertura dipendente dai file presenti"},
+        {"id":"football_data_org","label":"Football-Data.org","limits":"Richiede API key; piano gratuito limitato a 12 competizioni e dati ritardati"},
+        {"id":"api_football","label":"API-Football","limits":"Richiede API key; controllare quota e diritti di pubblicazione"},
+        {"id":"demo","label":"Demo sintetica","limits":"Solo test UI, dati fittizi marcati demo"}
     ]}
 
 @app.get("/api/competitions")
