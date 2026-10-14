@@ -12,6 +12,10 @@ def get_provider():
     if _provider is not None:
         return _provider
     kind=settings.data_provider.strip().lower()
+    # Demo scores and fixtures are synthetic. Never serve them accidentally when
+    # deployment configuration still says DATA_PROVIDER=demo; explicit opt-in only.
+    if kind == "demo" and not settings.allow_synthetic_demo:
+        kind = "openfootball_remote"
     if kind == "demo":
         _provider=DemoProvider()
     elif kind == "openfootball":
