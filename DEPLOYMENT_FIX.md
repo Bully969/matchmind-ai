@@ -47,3 +47,9 @@ Documentazione ufficiale:
 - [Variabili d'ambiente Vercel](https://vercel.com/docs/environment-variables/managing-environment-variables)
 - [Vite su Vercel](https://vercel.com/docs/frameworks/frontend/vite)
 - [Limiti dei servizi gratuiti Render](https://render.com/docs/free)
+
+## Build riproducibile: versione Python
+
+Il backend è fissato a Python 3.12.10 tramite `backend/.python-version`, la stessa major/minor usata da GitHub Actions. Le dipendenze in `backend/requirements.txt` sono bloccate a versioni note per evitare che Render risolva automaticamente versioni future diverse da quelle testate.
+
+Se un deploy fallisce ancora dopo questo allineamento, controlla il log Build completo del singolo deploy. L'evento Render può riportare una causa generica; la riga decisiva è in genere l'ultima eccezione o il passaggio di upload/avvio. Non rilanciare ripetutamente senza esaminare il nuovo log.
