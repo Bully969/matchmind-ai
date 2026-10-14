@@ -30,11 +30,28 @@ app.add_middleware(CORSMiddleware,allow_origins=settings.cors_origin_list,allow_
 
 @app.get("/api/health")
 async def health():
-    return {"status":"ok","app":settings.app_name,"version":"0.1.0","data_provider":settings.data_provider,"ai_provider":settings.ai_provider,"model_version":MODEL_VERSION,"note":"Health check only; does not certify data freshness or predictive accuracy."}
+    try:
+        active_provider = get_provider()
+        data_provider = active_provider.name
+        is_demo = active_provider.is_demo
+        provider_error = None
+    except Exception as exc:
+        data_provider = "unavailable"
+        is_demo = False
+        provider_error = type(exc).__name__
+    return {"status":"ok","app":settings.app_name,"version":"0.1.0","data_provider":data_provider,
+            "configured_data_provider":settings.data_provider,"is_demo":is_demo,
+            "provider_error":provider_error,"ai_provider":settings.ai_provider,"model_version":MODEL_VERSION,
+            "note":"Health check confirms application response, not data freshness or predictive accuracy."}
 
 @app.get("/api/providers")
 async def providers():
-    return {"data_provider":settings.data_provider,"ai_provider":settings.ai_provider,"providers":[
+    try:
+        active_data_provider = get_provider().name
+    except Exception:
+        active_data_provider = "unavailable"
+    return {"data_provider":active_data_provider,"configured_data_provider":settings.data_provider,
+            "ai_provider":settings.ai_provider,"providers":[
         {"id":"openfootball_remote","label":"OpenFootball pubblico CC0","limits":"8 competizioni della stagione 2026/27; calendari e risultati pubblicati; non live; nessuna quota, xG, formazione o infortunio"},
         {"id":"openfootball","label":"OpenFootball locale","limits":"Dataset sincronizzati manualmente in backend/data; copertura dipendente dai file presenti"},
         {"id":"football_data_org","label":"Football-Data.org","limits":"Richiede API key; piano gratuito limitato a 12 competizioni e dati ritardati"},
