@@ -112,15 +112,19 @@ async def recommendations(
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Impossibile caricare le partite: {type(exc).__name__}: {str(exc)[:200]}")
 
-    # Rank only upcoming fixtures whose state is explicitly scheduled. UNKNOWN,
-    # live, finished and postponed matches are intentionally excluded.
-    upcoming = [
-        fixture for fixture in fixtures
-        if fixture.get("status") == "SCHEDULED"
-        and fixture.get("kickoff") is not None
-        and fixture["kickoff"].date() >= date.today()
-        and not fixture.get("is_demo", False)
-    ]
+    # Only include confirmed pre-match fixtures. For matches today, kickoff must be known and in the future.
+    def is_upcoming(fixture: dict[str, Any]) -> bool:
+        kickoff = fixture.get("kickoff")
+        if fixture.get("status") != "SCHEDULED" or kickoff is None or fixture.get("is_demo", False):
+            return False
+        now = datetime.now(kickoff.tzinfo) if kickoff.tzinfo else datetime.now()
+        if kickoff.date() > now.date():
+            return True
+        if kickoff.date() < now.date():
+            return False
+        return bool(fixture.get("kickoff_time_known", False)) and kickoff > now
+
+    upcoming = [fixture for fixture in fixtures if is_upcoming(fixture)]
     upcoming = sorted(upcoming, key=lambda f: f["kickoff"])[:limit]
     semaphore = asyncio.Semaphore(5)
 
