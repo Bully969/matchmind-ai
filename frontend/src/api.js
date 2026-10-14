@@ -1,10 +1,34 @@
-const API = (import.meta.env.VITE_API_URL || 'http://localhost:8000').replace(/\/$/, '');
+const configuredApiUrl = (import.meta.env.VITE_API_URL || '').trim();
+const API = (configuredApiUrl || (import.meta.env.DEV ? 'http://localhost:8000' : '')).replace(/\/+$/, '');
+
+export const isApiConfigured = Boolean(API);
+export const apiBaseUrl = API;
+
 async function request(path, options = {}) {
-  const response = await fetch(`${API}${path}`, { headers: { 'Content-Type': 'application/json', ...(options.headers || {}) }, ...options });
+  if (!API) {
+    const error = new Error('API non configurata in produzione. Imposta VITE_API_URL con l’origine pubblica del backend FastAPI e ridistribuisci il frontend.');
+    error.code = 'API_NOT_CONFIGURED';
+    throw error;
+  }
+
+  let response;
+  try {
+    response = await fetch(`${API}${path}`, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(options.headers || {}),
+      },
+    });
+  } catch {
+    throw new Error(`Impossibile raggiungere il backend ${API}. Verifica che il servizio sia online e che CORS autorizzi il dominio del frontend.`);
+  }
+
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(payload.detail || `Richiesta fallita (${response.status})`);
   return payload;
 }
+
 export const getHealth = () => request('/api/health');
 export const getCompetitions = () => request('/api/competitions');
 export const getFixtures = (from, to, competition) => {

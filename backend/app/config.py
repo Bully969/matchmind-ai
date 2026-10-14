@@ -6,7 +6,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=str(Path(__file__).resolve().parents[2] / ".env"), env_file_encoding="utf-8", extra="ignore")
     app_name: str = "MatchMind AI"
     environment: str = "development"
-    cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
+    cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173,https://matchmind-ai-beta.vercel.app"
     data_provider: str = "demo"
     openfootball_data_dir: str = "./data/openfootball"
     football_data_api_key: str = ""

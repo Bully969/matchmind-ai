@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { analyzeMatch, askAnalyst, getCompetitions, getFixtures, getHealth, getPredictions } from './api';
+import { analyzeMatch, askAnalyst, getCompetitions, getFixtures, getHealth, getPredictions, isApiConfigured } from './api';
 
 const dLabel = (iso) => new Date(`${iso}T12:00:00`).toLocaleDateString('it-IT', { weekday: 'short', day: '2-digit', month: 'short' });
 const todayISO = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
@@ -69,21 +69,61 @@ export default function App() {
 
   const loadData = useCallback(async () => {
     setError('');
-    try {
-      const [h,c,p] = await Promise.all([getHealth(),getCompetitions(),getPredictions()]);
-      setHealth(h); setCompetitions(c.items||[]); setHistory(p.items||[]); setConnected(true);
-      const fs = await getFixtures(from,to,competition);
-      if ((fs.items||[]).length) {
-        setFixtures(fs.items);
-        setSelected(current => (fs.items||[]).find(f=>f.id===current?.id) || fs.items[0]);
-      } else if (!h?.data_provider?.includes('demo')) {
-        setFixtures([]); setSelected(null);
-      }
-    } catch (e) {
+
+    // Vite injects VITE_API_URL at build time. Do not silently point production
+    // visitors at their own localhost when the backend URL is missing.
+    if (!isApiConfigured) {
       setConnected(false);
       setHealth({data_provider:'demo locale',ai_provider:'demo'});
-      setError('Backend non collegato: stai esplorando una anteprima locale con dati sintetici. Avvia il backend per caricare la fonte configurata.');
-      setFixtures(demoFixtures); setSelected(current => current || demoFixtures[0]);
+      setCompetitions([]);
+      setHistory([]);
+      setFixtures(demoFixtures);
+      setSelected(current => current?.is_demo ? current : demoFixtures[0]);
+      setError('API non configurata: questa versione mostra solo dati dimostrativi. Pubblica il backend FastAPI e imposta VITE_API_URL nelle variabili Vercel, poi ridistribuisci.');
+      return;
+    }
+
+    const [healthResult, competitionsResult, predictionsResult, fixturesResult] = await Promise.allSettled([
+      getHealth(),
+      getCompetitions(),
+      getPredictions(),
+      getFixtures(from,to,competition),
+    ]);
+
+    const failures = [];
+    const healthOk = healthResult.status === 'fulfilled' && healthResult.value?.status === 'ok';
+    if (healthOk) {
+      setHealth(healthResult.value);
+    } else {
+      setHealth({data_provider:'backend non raggiungibile',ai_provider:'—'});
+      failures.push('connessione API');
+    }
+    setConnected(healthOk);
+
+    if (competitionsResult.status === 'fulfilled') {
+      setCompetitions(competitionsResult.value.items || []);
+    } else {
+      setCompetitions([]);
+      failures.push('competizioni');
+    }
+
+    if (predictionsResult.status === 'fulfilled') {
+      setHistory(predictionsResult.value.items || []);
+    } else {
+      setHistory([]);
+      failures.push('archivio pronostici');
+    }
+
+    if (fixturesResult.status === 'fulfilled') {
+      const nextFixtures = fixturesResult.value.items || [];
+      setFixtures(nextFixtures);
+      setSelected(current => nextFixtures.find(f=>f.id===current?.id) || nextFixtures[0] || null);
+    } else {
+      failures.push('calendario partite');
+    }
+
+    if (failures.length) {
+      setError(`Servizi non disponibili: ${failures.join(', ')}. Controlla l'URL del backend, la configurazione CORS e i log del servizio.`);
     }
   },[from,to,competition]);
 
@@ -98,15 +138,35 @@ export default function App() {
   const notify = (text) => { setToast(text); window.setTimeout(()=>setToast(''),2400); };
 
   async function runAnalysis() {
-    if (!selected) return;
+    if (!selected) {
+      setError('Seleziona una partita prima di avviare l’analisi.');
+      return;
+    }
+    if (!connected) {
+      setAnalysis(null);
+      setError(selected.is_demo
+        ? 'Analisi non eseguita: la partita è dimostrativa oppure il backend non è collegato. Nessuna probabilità viene inventata.'
+        : 'Analisi non eseguita: il backend non è collegato.');
+      return;
+    }
+    if (selected.is_demo) {
+      setAnalysis(null);
+      setError('Analisi non eseguita: la partita selezionata è un esempio dimostrativo. Seleziona una partita fornita dal backend.');
+      return;
+    }
+
     setAnalysisLoading(true); setError(''); setAnswer('');
     try {
-      if (!connected) throw new Error('Backend non collegato. Questa partita è soltanto un esempio dimostrativo.');
-      const result = await analyzeMatch(selected,odds); setAnalysis(result); setHistory((await getPredictions()).items||[]);
+      const result = await analyzeMatch(selected,odds);
+      setAnalysis(result);
+      const predictions = await getPredictions();
+      setHistory(predictions.items || []);
     } catch(e) {
-      setAnalysis({demo:true, probabilities:{home:.58,draw:.24,away:.18}, expected_goals:{home:1.62,away:.78}, markets:{over_2_5:.46,btts_yes:.42}, data_quality:{level:'low',note:e.message}, value_bets:[]});
-      if (connected) setError(e.message);
-    } finally { setAnalysisLoading(false); }
+      setAnalysis(null);
+      setError(`Analisi non disponibile: ${e.message}`);
+    } finally {
+      setAnalysisLoading(false);
+    }
   }
   async function ask() {
     if (!question.trim() || !selected) return;
@@ -191,7 +251,7 @@ export default function App() {
 function MatchHero({fixture,onOpenOdds}) {
   if (!fixture) return <section className="panel hero-panel no-selection"><span className="hero-label">MATCH CENTER</span><h2>Nessuna partita selezionata</h2><p>Scegli una partita dal calendario per aprire il centro analisi.</p></section>;
   const live = fixture.status==='LIVE';
-  return <section className="hero-panel"><div className="hero-topline"><span className="hero-label"><span>◉</span> {fixture.competition_name} · Match Center</span><DemoBadge/>{live&&<span className="live-pill"><i/> LIVE</span>}</div><div className="hero-matchup"><div className="hero-team"><TeamMark name={fixture.home_team}/><h2>{fixture.home_team}</h2><small>Casa</small></div><div className="score-block"><div className="scoreline"><strong>{fixture.home_score??'—'}</strong><span>:</span><strong>{fixture.away_score??'—'}</strong></div><span className={`match-status ${live?'is-live':''}`}>{live?(fixture.minute||'LIVE'):'IN PROGRAMMA'}</span><small>{formatDate(fixture.kickoff)}</small></div><div className="hero-team"><TeamMark name={fixture.away_team}/><h2>{fixture.away_team}</h2><small>Trasferta</small></div></div><div className="hero-bottom"><span>⌖ {fixture.country||'Competizione selezionata'}</span><span>☁ Meteo non collegato</span><button onClick={onOpenOdds}>Confronta quote ↗</button></div></section>;
+  return <section className="hero-panel"><div className="hero-topline"><span className="hero-label"><span>◉</span> {fixture.competition_name} · Match Center</span>{fixture.is_demo&&<DemoBadge/>}{live&&<span className="live-pill"><i/> LIVE</span>}</div><div className="hero-matchup"><div className="hero-team"><TeamMark name={fixture.home_team}/><h2>{fixture.home_team}</h2><small>Casa</small></div><div className="score-block"><div className="scoreline"><strong>{fixture.home_score??'—'}</strong><span>:</span><strong>{fixture.away_score??'—'}</strong></div><span className={`match-status ${live?'is-live':''}`}>{live?(fixture.minute||'LIVE'):'IN PROGRAMMA'}</span><small>{formatDate(fixture.kickoff)}</small></div><div className="hero-team"><TeamMark name={fixture.away_team}/><h2>{fixture.away_team}</h2><small>Trasferta</small></div></div><div className="hero-bottom"><span>⌖ {fixture.country||'Competizione selezionata'}</span><span>☁ Meteo non collegato</span><button onClick={onOpenOdds}>Confronta quote ↗</button></div></section>;
 }
 function EventTimeline({fixture}) {
   const live=fixture?.status==='LIVE';
