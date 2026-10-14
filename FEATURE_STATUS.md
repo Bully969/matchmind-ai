@@ -10,12 +10,13 @@ Aggiornato: 14 ottobre 2026.
 - Componenti UI per timeline, statistiche a barre, pitch tattico, rating giocatori, sintesi editoriale, trend quote e archivio. I valori statici sono demo visive e vengono etichettati.
 - PWA: manifest, icone, meta tag iOS, service worker di shell e responsive styling.
 - API FastAPI con health check, elenco competizioni/partite, analisi statistica Poisson baseline, chat spiegativa configurabile e salvataggio storico minimo su database.
+- Provider remoto OpenFootball CC0 per calendario, risultati pubblicati e forma recente in 8 competizioni della stagione 2026/27; non è un feed live e non fornisce quote o statistiche avanzate.
 - Adapters dati per demo, OpenFootball, Football-Data.org e API-Football inclusi nello starter kit. L'uso reale dipende da configurazione, limiti e permessi del provider.
 
 ## Ancora da implementare o collegare prima di una beta reale
 
 - Quote bookmaker in tempo reale, snapshot storici delle quote e trend: serve un provider con diritti adeguati. La tabella attuale è illustrativa.
-- Feed live per eventi, statistiche, xG, formazioni, rating, immagini e notizie: la UI è predisposta, ma non tutti gli adapter esistono e nessuno garantisce copertura uniforme.
+- Feed live per eventi, statistiche, xG, formazioni, rating, immagini e notizie: non forniti dal provider OpenFootball. La UI non deve presentarli come dati verificati.
 - Account privati su invito, ruoli, gestione sessioni, audit di sicurezza e isolazione utenti.
 - Registro append-only con versioning completo, settlement/risultati automatici e validazione degli esiti per mercato. L'archivio corrente è minimo.
 - Report schedulati con worker persistente cloud, task di refresh, retry/backoff e notifiche in-app effettive.

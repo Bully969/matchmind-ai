@@ -1,5 +1,6 @@
 from .demo import DemoProvider
 from .openfootball import OpenFootballProvider
+from .openfootball_remote import OpenFootballRemoteProvider
 from .football_data_org import FootballDataOrgProvider
 from .api_football import ApiFootballProvider
 from ..config import settings
@@ -15,6 +16,8 @@ def get_provider():
         _provider=DemoProvider()
     elif kind == "openfootball":
         _provider=OpenFootballProvider(settings.openfootball_data_dir)
+    elif kind == "openfootball_remote":
+        _provider=OpenFootballRemoteProvider()
     elif kind == "football_data_org":
         if not settings.football_data_api_key:
             raise RuntimeError("DATA_PROVIDER=football_data_org ma FOOTBALL_DATA_API_KEY è vuota")
