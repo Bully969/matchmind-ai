@@ -11,22 +11,33 @@ async function request(path, options = {}) {
     throw error;
   }
 
-  let response;
+  const { timeoutMs = 30000, ...fetchOptions } = options;
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), timeoutMs);
   try {
-    response = await fetch(`${API}${path}`, {
-      ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        ...(options.headers || {}),
-      },
+    const response = await fetch(`${API}${path}`, {
+      ...fetchOptions,
+      signal: controller.signal,
+      headers: {'Content-Type': 'application/json', ...(options.headers || {})},
     });
-  } catch {
-    throw new Error(`Impossibile raggiungere il backend ${API}. Verifica che il servizio sia online e che CORS autorizzi il dominio del frontend.`);
+    let payload;
+    try { payload = await response.json(); }
+    catch (error) {
+      if (controller.signal.aborted) throw error;
+      throw new Error(`Risposta API non valida (${response.status}). Riprova tra poco.`);
+    }
+    if (!response.ok) {
+      const detail = typeof payload.detail === 'string' ? payload.detail : `Richiesta fallita (${response.status})`;
+      throw new Error(detail);
+    }
+    return payload;
+  } catch (error) {
+    if (controller.signal.aborted) throw new Error(`Il backend non ha risposto entro ${timeoutMs / 1000} secondi. Potrebbe essere in avvio: riprova tra poco.`);
+    if (error instanceof TypeError) throw new Error(`Impossibile raggiungere il backend ${API}. Verifica la connessione e riprova.`);
+    throw error;
+  } finally {
+    window.clearTimeout(timeout);
   }
-
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(payload.detail || `Richiesta fallita (${response.status})`);
-  return payload;
 }
 
 export const getHealth = () => request('/api/health');
@@ -43,7 +54,7 @@ export const analyzeMatch = (fixture, odds) => request('/api/analyze', { method:
   is_demo: fixture.is_demo, odds_home: odds.home ? Number(odds.home) : null,
   odds_draw: odds.draw ? Number(odds.draw) : null, odds_away: odds.away ? Number(odds.away) : null
 }) });
-export const askAnalyst = (message, fixture, analysis) => request('/api/chat', { method: 'POST', body: JSON.stringify({ message, fixture, analysis }) });
+export const askAnalyst = (message, fixture, analysis) => request('/api/chat', { timeoutMs: 45000, method: 'POST', body: JSON.stringify({ message, fixture_id: fixture.id, competition_id: fixture.competition_id, fixture_date: fixture.kickoff_date || fixture.kickoff?.slice(0,10) }) });
 export const getPredictions = () => request('/api/predictions?limit=10');
 export const getRecommendations = (from, to, competition, limit = 20) => {
   const p = new URLSearchParams({ date_from: from, date_to: to, limit: String(limit) });
