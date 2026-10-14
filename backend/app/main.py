@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+import asyncio
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -15,6 +16,7 @@ from .schemas import AnalyzeRequest, ChatRequest
 from .providers.factory import get_provider
 from .services.predictor import analyse_matches, MODEL_VERSION
 from .services.llm import explain
+from .services.recommendations import rank_market_candidates
 
 limiter=Limiter(key_func=get_remote_address)
 
@@ -82,6 +84,126 @@ async def fixtures(request: Request, date_from: date|None=None, date_to: date|No
         return {"items":items,"count":len(items),"source":provider.name,"is_demo":provider.is_demo,"retrieved_at":datetime.now(timezone.utc).isoformat(),"date_from":start,"date_to":end}
     except Exception as exc:
         raise HTTPException(status_code=502,detail=f"Errore fonte dati: {type(exc).__name__}: {str(exc)[:300]}")
+
+@app.get("/api/recommendations")
+@limiter.limit("8/minute")
+async def recommendations(
+    request: Request,
+    date_from: date | None = None,
+    date_to: date | None = None,
+    competition_id: str | None = None,
+    limit: int = Query(default=20, ge=1, le=40),
+):
+    """Return statistically ranked watchlist candidates, never 'safe bets'.
+
+    This endpoint deliberately does not persist predictions: it is a transient
+    scan. The existing /api/analyze route persists only user-requested analyses.
+    """
+    start = date_from or date.today()
+    end = date_to or (start + timedelta(days=7))
+    if end < start:
+        raise HTTPException(status_code=400, detail="date_to non può precedere date_from")
+    if (end - start).days > 14:
+        raise HTTPException(status_code=400, detail="Per il ranking usa un intervallo massimo di 14 giorni")
+
+    try:
+        provider = get_provider()
+        fixtures = await provider.fixtures(start, end, competition_id)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Impossibile caricare le partite: {type(exc).__name__}: {str(exc)[:200]}")
+
+    # Rank only upcoming fixtures whose state is explicitly scheduled. UNKNOWN,
+    # live, finished and postponed matches are intentionally excluded.
+    upcoming = [
+        fixture for fixture in fixtures
+        if fixture.get("status") == "SCHEDULED"
+        and fixture.get("kickoff") is not None
+        and fixture["kickoff"].date() >= date.today()
+        and not fixture.get("is_demo", False)
+    ]
+    upcoming = sorted(upcoming, key=lambda f: f["kickoff"])[:limit]
+    semaphore = asyncio.Semaphore(5)
+
+    async def inspect_fixture(fixture: dict[str, Any]) -> dict[str, Any]:
+        async with semaphore:
+            try:
+                before = fixture["kickoff"].date()
+                home_recent, away_recent = await asyncio.gather(
+                    provider.recent_team_matches(
+                        fixture["home_team"], fixture.get("home_team_id"),
+                        fixture["competition_id"], fixture.get("season"), before,
+                    ),
+                    provider.recent_team_matches(
+                        fixture["away_team"], fixture.get("away_team_id"),
+                        fixture["competition_id"], fixture.get("season"), before,
+                    ),
+                )
+                analysis = analyse_matches(
+                    fixture["home_team"], fixture["away_team"],
+                    home_recent, away_recent, odds=None, is_demo=False,
+                )
+                ranking = rank_market_candidates(analysis, is_demo=provider.is_demo)
+                return {
+                    "fixture": fixture,
+                    "analysis_available": True,
+                    "analysis": analysis,
+                    "recommendation": ranking,
+                }
+            except ValueError as exc:
+                return {
+                    "fixture": fixture,
+                    "analysis_available": False,
+                    "analysis": None,
+                    "recommendation": {
+                        "candidates": [],
+                        "decision": "NO_SELECTION",
+                        "can_recommend_real_money_bet": False,
+                        "calibration_status": "NOT_VALIDATED",
+                        "bookmaker_odds_status": "NOT_CONNECTED",
+                        "reason": str(exc),
+                    },
+                }
+            except Exception as exc:
+                return {
+                    "fixture": fixture,
+                    "analysis_available": False,
+                    "analysis": None,
+                    "recommendation": {
+                        "candidates": [],
+                        "decision": "NO_SELECTION",
+                        "can_recommend_real_money_bet": False,
+                        "calibration_status": "NOT_VALIDATED",
+                        "bookmaker_odds_status": "NOT_CONNECTED",
+                        "reason": f"Dato non disponibile: {type(exc).__name__}",
+                    },
+                }
+
+    items = await asyncio.gather(*(inspect_fixture(f) for f in upcoming))
+    ranked = []
+    for item in items:
+        for candidate in item["recommendation"].get("candidates", []):
+            ranked.append({
+                "fixture": item["fixture"],
+                **candidate,
+                "decision": "WATCHLIST_ONLY",
+                "can_recommend_real_money_bet": False,
+            })
+    ranked.sort(key=lambda x: x["probability"], reverse=True)
+    return {
+        "items": items,
+        "ranked_candidates": ranked[:40],
+        "count": len(items),
+        "analyzed_count": sum(1 for item in items if item["analysis_available"]),
+        "candidate_count": len(ranked),
+        "source": provider.name,
+        "is_demo": provider.is_demo,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "calibration_status": "NOT_VALIDATED",
+        "bookmaker_odds_status": "NOT_CONNECTED",
+        "can_recommend_real_money_bet": False,
+        "message": "Ranking statistico sperimentale: nessuna giocata è considerata sicura. Quote aggiornate e validazione out-of-sample sono obbligatorie prima di parlare di value bet.",
+    }
+
 
 @app.post("/api/analyze")
 @limiter.limit("10/minute")
