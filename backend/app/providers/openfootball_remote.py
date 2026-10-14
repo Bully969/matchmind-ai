@@ -176,10 +176,12 @@ class OpenFootballRemoteProvider(DataProvider):
         results = await asyncio.gather(*jobs, return_exceptions=True)
         out = []
         errors = []
+        loaded_datasets = 0
         for cid, result in zip(ids, results):
             if isinstance(result, Exception):
                 errors.append(result)
                 continue
+            loaded_datasets += len(result)
             config = COMPETITIONS[cid]
             for season, dataset in result:
                 for raw in dataset.get("matches", []):
@@ -188,7 +190,7 @@ class OpenFootballRemoteProvider(DataProvider):
                     fixture = self._normalize_match(raw, cid, config, season)
                     if fixture and date_from <= fixture["kickoff"].date() <= date_to:
                         out.append(fixture)
-        if not out and errors and not any(self._cache.values()):
+        if loaded_datasets == 0 and errors:
             raise RuntimeError(f"OpenFootball non raggiungibile: {type(errors[0]).__name__}")
         return sorted(out, key=lambda item: item["kickoff"])
 
