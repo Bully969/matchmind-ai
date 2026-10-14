@@ -8,6 +8,7 @@ import asyncio
 import time as clock
 from datetime import date, datetime, time
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import httpx
 
@@ -20,14 +21,14 @@ CACHE_TTL_SECONDS = 6 * 60 * 60
 # Only competitions with a dataset for the current 2026/27 season appear in the live
 # catalogue. The 2025/26 file is still used to seed recent-form estimates.
 COMPETITIONS: dict[str, dict[str, Any]] = {
-    "it.1": {"name": "Serie A", "country": "Italia", "current": "2026-27/it.1.json", "previous": "2025-26/it.1.json"},
-    "en.1": {"name": "Premier League", "country": "Inghilterra", "current": "2026-27/en.1.json", "previous": "2025-26/en.1.json"},
-    "en.2": {"name": "Championship", "country": "Inghilterra", "current": "2026-27/en.2.json", "previous": "2025-26/en.2.json"},
-    "de.1": {"name": "Bundesliga", "country": "Germania", "current": "2026-27/de.1.json", "previous": "2025-26/de.1.json"},
-    "es.1": {"name": "La Liga", "country": "Spagna", "current": "2026-27/es.1.json", "previous": "2025-26/es.1.json"},
-    "fr.1": {"name": "Ligue 1", "country": "Francia", "current": "2026-27/fr.1.json", "previous": "2025-26/fr.1.json"},
-    "nl.1": {"name": "Eredivisie", "country": "Paesi Bassi", "current": "2026-27/nl.1.json", "previous": "2025-26/nl.1.json"},
-    "pt.1": {"name": "Primeira Liga", "country": "Portogallo", "current": "2026-27/pt.1.json", "previous": "2025-26/pt.1.json"},
+    "it.1": {"name": "Serie A", "country": "Italia", "timezone": "Europe/Rome", "current": "2026-27/it.1.json", "previous": "2025-26/it.1.json"},
+    "en.1": {"name": "Premier League", "country": "Inghilterra", "timezone": "Europe/London", "current": "2026-27/en.1.json", "previous": "2025-26/en.1.json"},
+    "en.2": {"name": "Championship", "country": "Inghilterra", "timezone": "Europe/London", "current": "2026-27/en.2.json", "previous": "2025-26/en.2.json"},
+    "de.1": {"name": "Bundesliga", "country": "Germania", "timezone": "Europe/Berlin", "current": "2026-27/de.1.json", "previous": "2025-26/de.1.json"},
+    "es.1": {"name": "La Liga", "country": "Spagna", "timezone": "Europe/Madrid", "current": "2026-27/es.1.json", "previous": "2025-26/es.1.json"},
+    "fr.1": {"name": "Ligue 1", "country": "Francia", "timezone": "Europe/Paris", "current": "2026-27/fr.1.json", "previous": "2025-26/fr.1.json"},
+    "nl.1": {"name": "Eredivisie", "country": "Paesi Bassi", "timezone": "Europe/Amsterdam", "current": "2026-27/nl.1.json", "previous": "2025-26/nl.1.json"},
+    "pt.1": {"name": "Primeira Liga", "country": "Portogallo", "timezone": "Europe/Lisbon", "current": "2026-27/pt.1.json", "previous": "2025-26/pt.1.json"},
 }
 
 
@@ -107,9 +108,10 @@ class OpenFootballRemoteProvider(DataProvider):
                 time_known = True
             except ValueError:
                 pass
-        # football.json provides local wall-clock times without a timezone. Keep the
-        # datetime naive instead of falsely labelling the kickoff as UTC.
-        kickoff = datetime.combine(match_date, kickoff_time)
+        # football.json provides local wall-clock times. Attach each competition's
+        # timezone so the browser can accurately render the kickoff in Europe/Rome.
+        local_zone = ZoneInfo(competition.get("timezone", "Europe/Rome"))
+        kickoff = datetime.combine(match_date, kickoff_time, tzinfo=local_zone)
 
         score = raw.get("score") or {}
         ft = score.get("ft") if isinstance(score, dict) else None
