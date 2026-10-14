@@ -44,7 +44,11 @@ class AnalyzeRequest(BaseModel):
 
 class ChatRequest(BaseModel):
     message: str = Field(min_length=2, max_length=1500)
-    fixture: dict[str, Any]
+    fixture_id: str | None = Field(default=None, max_length=500)
+    competition_id: str | None = Field(default=None, max_length=120)
+    fixture_date: date | None = None
+    # Compatibility with older clients: only identifiers are read from these.
+    fixture: dict[str, Any] | None = None
     analysis: dict[str, Any] | None = None
 
 class SettleRequest(BaseModel):
