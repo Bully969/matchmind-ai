@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     environment: str = "development"
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173,https://matchmind-ai-beta.vercel.app"
     data_provider: str = "openfootball_remote"
+    allow_synthetic_demo: bool = False
     openfootball_data_dir: str = "./data/openfootball"
     football_data_api_key: str = ""
     api_football_key: str = ""
