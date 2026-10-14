@@ -5,7 +5,7 @@ Starter full-stack per una piattaforma di analisi calcistica, probabilità, valu
 ## Obiettivi della prima versione
 
 - UI React/Vite e API FastAPI.
-- Provider intercambiabili: demo, dataset OpenFootball in pubblico dominio CC0, API Football-Data.org e API-Football.
+- Provider intercambiabili: OpenFootball pubblico remoto (CC0; default, senza API key), dataset OpenFootball sincronizzati localmente, demo esplicita, Football-Data.org e API-Football.
 - Baseline probabilistica Poisson basata sulle ultime partite disponibili, con segnali di qualità e avvisi per dati insufficienti.
 - Valore atteso calcolato solo quando l'utente inserisce quote.
 - AI con provider configurabile: template deterministico, Ollama in locale o endpoint compatibile OpenAI.
@@ -16,7 +16,7 @@ Starter full-stack per una piattaforma di analisi calcistica, probabilità, valu
 
 L'app supporta un catalogo dinamico, ma nessuna fonte gratuita garantisce in modo affidabile tutti i campionati, le quote, gli xG, le formazioni e gli infortuni in tempo reale.
 
-- **OpenFootball**: dati di calendario e risultati in pubblico dominio (CC0), con copertura ampia ma non universale e aggiornamento non garantito. Non include quote live, infortuni o xG.
+- **OpenFootball remoto (default)**: usa i dataset JSON pubblici CC0 su GitHub. Nella stagione corrente sono predisposte 8 competizioni: Serie A, Premier League, Championship, Bundesliga, La Liga, Ligue 1, Eredivisie e Primeira Liga. I risultati vengono pubblicati dai manutentori, non sono live; non include quote, eventi minuto per minuto, xG, formazioni o infortuni. Se il repository upstream non ha ancora pubblicato un aggiornamento, MatchMind non può inventarlo. Fonte: https://github.com/openfootball/football.json.
 - **Football-Data.org**: piano gratuito limitato a 12 competizioni, risultati/calendari ritardati e 10 richieste/minuto; include obbligo di attribuzione in-app. Non è “tutto il calcio”.
 - **API-Football**: il piano gratuito indica 100 richieste al giorno e accesso agli endpoint delle competizioni con limitazioni stagionali. L’adapter qui incluso carica solo le prime 3 pagine per risparmiare quota; aumentare il limite richiede più richieste e può consumare rapidamente il piano gratuito. Le condizioni avvertono inoltre che la pubblicazione dei dati e l'uso commerciale possono dipendere dai diritti di terze parti. Prima di esporre dati tramite un sito pubblico, verifica le autorizzazioni necessarie.
 - **football-data.co.uk** non viene usato nel progetto: il sito dichiara che i dati sono per individui privati e non per prodotti commerciali o addestramento AI.
