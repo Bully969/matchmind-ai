@@ -1,0 +1,29 @@
+/* Ranked statistical candidates */
+.ranked-picks-list { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
+.ranked-pick-card {
+  display: flex; flex-direction: column; gap: 11px; width: 100%; text-align: left;
+  border: 1px solid rgba(105,146,183,.22); border-radius: 13px;
+  background: linear-gradient(145deg, rgba(14,28,44,.95), rgba(8,18,31,.98));
+  color: #edf4fc; padding: 14px; cursor: pointer;
+}
+.ranked-pick-card:hover { border-color: rgba(108,229,207,.52); background: rgba(16,39,51,.95); }
+.ranked-pick-top, .ranked-pick-market, .ranked-pick-foot {
+  display: flex; align-items: center; justify-content: space-between; gap: 9px;
+}
+.ranked-pick-top { min-width: 0; }
+.rank-number { display: inline-grid; place-items: center; width: 25px; height: 25px; flex: 0 0 25px; border-radius: 8px; background: rgba(108,229,207,.12); color: #a3f3e6; font-size: 10px; font-weight: 800; }
+.ranked-pick-top .pick-competition { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ranked-pick-match { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; font-size: 12px; font-weight: 650; }
+.ranked-pick-match span:last-child { text-align: right; }
+.ranked-pick-match b { color: #6f879f; font-size: 10px; }
+.ranked-pick-market { border-top: 1px solid rgba(104,145,182,.16); padding-top: 10px; }
+.ranked-pick-market span { color: #bad0df; font-size: 12px; }
+.ranked-pick-market strong { color: #98f0df; font-size: 21px; letter-spacing: -.5px; }
+.ranked-pick-foot { font-size: 9px; line-height: 1.5; color: #8fa5ba; }
+.ranked-pick-foot span:last-child { color: #9adfd5; white-space: nowrap; }
+@media (max-width: 700px) {
+  .ranked-pick-card { padding: 12px; }
+  .ranked-pick-top .pill-muted { font-size: 8px; }
+  .ranked-pick-market strong { font-size: 19px; }
+  .ranked-pick-foot { align-items: flex-start; }
+}
