@@ -11,7 +11,9 @@ services:
       - key: ENVIRONMENT
         value: production
       - key: DATA_PROVIDER
-        value: demo
+        value: openfootball_remote
+      - key: ALLOW_SYNTHETIC_DEMO
+        value: false
       - key: AI_PROVIDER
         value: template
       - key: CORS_ORIGINS
