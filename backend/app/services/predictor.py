@@ -53,6 +53,17 @@ def analyse_matches(home_team: str, away_team: str, home_recent: list[dict[str, 
         "most_likely_1x2":max_outcome,
         "data_quality":{"level":quality,"home_matches":len(home_recent),"away_matches":len(away_recent),"note":"Baseline su risultati recenti; non usa xG, assenze, quote di mercato o formazione confermata."},
         "value_bets":value_bets,
+        "decision_support":{
+            "status":"ANALYSIS_ONLY",
+            "can_recommend_real_money_bet":False,
+            "calibration_status":"NOT_VALIDATED",
+            "bookmaker_odds_status":"MANUAL_OR_NOT_CONNECTED",
+            "reasons":[
+                "Il modello Poisson è una baseline sperimentale non calibrata out-of-sample.",
+                "Le quote eventualmente inserite manualmente non sono verificate né timestampate da un provider.",
+                "Una probabilità stimata non è una misura di sicurezza e non garantisce un profitto."
+            ]
+        },
         "is_demo":is_demo,
         "disclaimer":"Le probabilità sono stime sperimentali, non garanzie. Una probabilità più alta non implica profitto; la qualità dipende dalla fonte e dalla calibrazione fuori campione."
     }
