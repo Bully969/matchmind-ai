@@ -34,7 +34,7 @@ Dopo che entrambi i deploy sono completati:
 
 ## 4. Quando il backend restituisce errori
 
-- `API non configurata`: manca `VITE_API_URL) in Vercel o il deployment non è stato ricostruito.
+- `API non configurata`: manca `VITE_API_URL` in Vercel o il deployment non è stato ricostruito.
 - `Failed to fetch` / CORS: controlla che l'API sia online, che l'URL sia HTTPS corretto e che `CORS_ORIGINS` contenga l'origine esatta del sito.
 - `502` su `/api/competitions` o `/api/fixtures`: il server è raggiungibile, ma il provider selezionato ha generato un errore. Controlla Render → Logs e le variabili del provider.
 - Primo caricamento lento: un web service Render Free può essere sospeso dopo un periodo di inattività e deve riavviarsi alla richiesta successiva.
