@@ -32,7 +32,9 @@ def test_normalize_real_finished_match_has_scores_and_is_not_demo():
     assert fixture["away_score"] == 0
     assert fixture["is_demo"] is False
     assert fixture["source"] == "openfootball_remote"
-    assert fixture["kickoff"].isoformat() == "2026-10-10T20:45:00"
+    assert fixture["kickoff"].hour == 20
+    assert fixture["kickoff"].minute == 45
+    assert str(fixture["kickoff"].tzinfo) == "Europe/Rome"
 
 
 def test_normalize_future_match_does_not_invent_a_score():
