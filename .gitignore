@@ -1,0 +1,19 @@
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.env
+backend/.env
+backend/data/
+# Node
+node_modules/
+frontend/dist/
+# Local datasets and database
+/data/openfootball/
+*.db
+*.sqlite3
+# OS/editor
+.DS_Store
+Thumbs.db
+.vscode/

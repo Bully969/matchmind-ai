@@ -1,0 +1,29 @@
+services:
+  api:
+    build: ./backend
+    env_file:
+      - .env
+    environment:
+      OLLAMA_BASE_URL: http://host.docker.internal:11434
+      DATABASE_URL: sqlite:///./data/tipster.db
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend/data:/app/data
+      - ./data/openfootball:/app/data/openfootball:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  web:
+    image: node:22-alpine
+    working_dir: /app
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+    ports:
+      - "5173:5173"
+    environment:
+      VITE_API_URL: http://localhost:8000
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - api
