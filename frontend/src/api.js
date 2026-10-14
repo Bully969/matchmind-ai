@@ -45,3 +45,8 @@ export const analyzeMatch = (fixture, odds) => request('/api/analyze', { method:
 }) });
 export const askAnalyst = (message, fixture, analysis) => request('/api/chat', { method: 'POST', body: JSON.stringify({ message, fixture, analysis }) });
 export const getPredictions = () => request('/api/predictions?limit=10');
+export const getRecommendations = (from, to, competition, limit = 20) => {
+  const p = new URLSearchParams({ date_from: from, date_to: to, limit: String(limit) });
+  if (competition) p.set('competition_id', competition);
+  return request(`/api/recommendations?${p.toString()}`);
+};
