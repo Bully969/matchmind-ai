@@ -25,7 +25,7 @@ export default function App() {
   const [moreOpen,setMoreOpen] = useState(false);
   const [matchTab,setMatchTab] = useState('Riassunto');
   const [market,setMarket] = useState('1X2');
-  const [dateMode,setDateMode] = useState('Oggi');
+  const [dateMode,setDateMode] = useState('Settimana');
   const [query,setQuery] = useState('');
   const [health,setHealth] = useState(null);
   const [competitions,setCompetitions] = useState([]);
@@ -41,7 +41,7 @@ export default function App() {
   const [error,setError] = useState('');
   const [competition,setCompetition] = useState('');
   const [from,setFrom] = useState(todayISO());
-  const [to,setTo] = useState(todayISO());
+  const [to,setTo] = useState(plusDays(7));
   const [odds,setOdds] = useState({home:'',draw:'',away:''});
   const [favorites,setFavorites] = useState([]);
   const [question,setQuestion] = useState('Quali sono i fattori più importanti per questa partita e quali limiti ha l’analisi?');
@@ -56,22 +56,27 @@ export default function App() {
   const [pushEnabled,setPushEnabled] = useState(false);
   const loadSequence = useRef(0);
   const contextSequence = useRef(0);
+  const selectedRef = useRef(null);
   const [dataLoading,setDataLoading] = useState(false);
   const [connected,setConnected] = useState(false);
   const [toast,setToast] = useState('');
 
+  const applySelection = useCallback((next) => {
+    if (selectedRef.current?.id !== next?.id) {
+      contextSequence.current++;
+      setChatLoading(false);
+      setAnalysisLoading(false);
+      setAnalysis(null);
+      setAnswer('');
+    }
+    selectedRef.current = next;
+    setSelected(next);
+  }, []);
+
   const loadData = useCallback(async () => {
     const sequence = ++loadSequence.current;
-    contextSequence.current++;
-    setChatLoading(false);
-    setAnalysisLoading(false);
     setDataLoading(true);
     setError('');
-    setFixtures([]);
-    setSourceStatus(null);
-    setSelected(null);
-    setAnalysis(null);
-    setAnswer('');
 
     // Vite injects VITE_API_URL at build time. Do not silently point production
     // visitors at their own localhost when the backend URL is missing.
@@ -82,7 +87,7 @@ export default function App() {
       setCompetitions([]);
       setHistory([]);
       setFixtures([]);
-      setSelected(null);
+      applySelection(null);
       setError('API non configurata: nessuna partita è stata caricata. Imposta VITE_API_URL con l’indirizzo del backend e ridistribuisci.');
       return;
     }
@@ -124,15 +129,18 @@ export default function App() {
       const nextFixtures = fixturesResult.value.items || [];
       setFixtures(nextFixtures);
       setSourceStatus(fixturesResult.value.data_status || null);
-      setSelected(current => nextFixtures.find(f=>f.id===current?.id) || nextFixtures[0] || null);
+      applySelection(nextFixtures.find(f=>f.id===selectedRef.current?.id) || nextFixtures[0] || null);
     } else {
+      setFixtures([]);
+      setSourceStatus(null);
+      applySelection(null);
       failures.push('calendario partite');
     }
 
     if (failures.length) {
       setError(`Servizi non disponibili: ${failures.join(', ')}. Controlla l'URL del backend, la configurazione CORS e i log del servizio.`);
     }
-  },[from,to,competition]);
+  },[from,to,competition,applySelection]);
 
   const loadRecommendations = useCallback(async () => {
     if (!isApiConfigured || !connected) {
@@ -162,7 +170,7 @@ export default function App() {
     return fixtures.filter(f => (!competition || f.competition_id===competition) && (!q || `${f.home_team} ${f.away_team} ${f.competition_name}`.toLowerCase().includes(q)));
   },[fixtures,competition,query]);
   const grouped = useMemo(() => visibleFixtures.reduce((a,f)=>{(a[f.competition_name] ||= []).push(f);return a;},{}),[visibleFixtures]);
-  const selectFixture = (f) => { contextSequence.current++; setChatLoading(false); setAnalysisLoading(false); setSelected(f); setAnalysis(null); setAnswer(''); setMatchTab('Riassunto'); setPage('home'); setOdds({home:'',draw:'',away:''}); };
+  const selectFixture = (f) => { contextSequence.current++; setChatLoading(false); setAnalysisLoading(false); applySelection(f); setAnalysis(null); setAnswer(''); setMatchTab('Riassunto'); setPage('home'); setOdds({home:'',draw:'',away:''}); };
   const toggleFavorite = (id) => setFavorites(xs => xs.includes(id) ? xs.filter(x=>x!==id) : [...xs,id]);
   const notify = (text) => { setToast(text); window.setTimeout(()=>setToast(''),2400); };
 
@@ -254,7 +262,7 @@ export default function App() {
             <div className="date-switcher">{['Ieri','Oggi','Domani'].map((d,i)=><button key={d} className={dateMode===d?'selected':''} onClick={()=>{setDateMode(d);setFrom(plusDays(i-1));setTo(plusDays(i-1));}}>{d}<small>{dLabel(plusDays(i-1))}</small></button>)}</div>
             <div className="competition-filter"><span>Competizioni</span><button onClick={()=>setCompetition('')}>Tutte <span>⌄</span></button></div>
             <div className="league-list">{competitions.slice(0,6).map((league,i)=><button key={league.id} className="league-chip" onClick={()=>{setCompetition(league.id);setPage('calendar');}}><span className={`league-icon league-${i}`}>{({'it.1':'🇮🇹','en.1':'🇬🇧','en.2':'🏴','es.1':'🇪🇸','de.1':'🇩🇪','fr.1':'🇫🇷','nl.1':'🇳🇱','pt.1':'🇵🇹'})[league.id] || '⚽'}</span><span>{league.name}</span><span className="league-count">{visibleFixtures.filter(f=>f.competition_id===league.id).length}</span></button>)}</div>
-            <div className="fixture-section-title"><span>In evidenza</span><span>{visibleFixtures.length} partite</span></div>
+            <div className="fixture-section-title"><span>{from===to ? dLabel(from) : `${dLabel(from)} – ${dLabel(to)}`}</span><span>{visibleFixtures.length} partite</span></div>
             <div className="fixture-mini-list">{dataLoading ? <div className="data-unavailable">Caricamento partite…</div> : visibleFixtures.length ? visibleFixtures.slice(0,5).map(f=><button key={f.id} className={`fixture-mini ${selected?.id===f.id?'chosen':''}`} onClick={()=>selectFixture(f)}><div className="fixture-mini-top"><span>{f.competition_name}</span>{f.status==='LIVE'?<span className="live-pill"><i/> LIVE</span>:<time>{formatFixtureDate(f)}</time>}</div><div className="fixture-teams"><span><TeamMark name={f.home_team} small/>{f.home_team}</span><b>{f.home_score!=null?f.home_score:'—'} <small>:</small> {f.away_score!=null?f.away_score:'—'}</b><span><TeamMark name={f.away_team} small/>{f.away_team}</span></div><div className="fixture-mini-bottom"><span>{f.status==='LIVE'?(f.minute||'In corso'):'Calcio d’inizio · '+formatFixtureDate(f)}</span><span className="fixture-open">↗</span></div></button>) : <div className="data-unavailable compact-empty"><strong>Nessuna partita disponibile</strong><small>Prova un’altra data, oppure aggiorna la connessione alla fonte.</small><button className="button secondary" onClick={loadData}>Aggiorna dati</button></div>}</div>
 
             <div className="source-note"><span>ⓘ</span> <span>Fonte: <b>{health?.data_provider || 'non collegata'}</b>. Il dataset pubblica calendari e risultati, non eventi live o quote bookmaker. L’ora dell’ultimo aggiornamento editoriale non è disponibile.</span></div>

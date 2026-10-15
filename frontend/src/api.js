@@ -1,11 +1,12 @@
 const configuredApiUrl = (import.meta.env.VITE_API_URL || '').trim();
-const API = (configuredApiUrl || (import.meta.env.DEV ? 'http://localhost:8000' : '')).replace(/\/+$/, '');
+// Hosted builds use the same-origin Vercel rewrite; local dev keeps its explicit API URL.
+const API = (import.meta.env.PROD ? '' : configuredApiUrl || 'http://localhost:8000').replace(/\/+$/, '');
 
-export const isApiConfigured = Boolean(API);
+export const isApiConfigured = import.meta.env.PROD || Boolean(API);
 export const apiBaseUrl = API;
 
 async function request(path, options = {}) {
-  if (!API) {
+  if (!isApiConfigured) {
     const error = new Error('API non configurata in produzione. Imposta VITE_API_URL con l’origine pubblica del backend FastAPI e ridistribuisci il frontend.');
     error.code = 'API_NOT_CONFIGURED';
     throw error;
@@ -54,7 +55,7 @@ export const analyzeMatch = (fixture, odds) => request('/api/analyze', { method:
   is_demo: fixture.is_demo, odds_home: odds.home ? Number(odds.home) : null,
   odds_draw: odds.draw ? Number(odds.draw) : null, odds_away: odds.away ? Number(odds.away) : null
 }) });
-export const askAnalyst = (message, fixture, analysis) => request('/api/chat', { timeoutMs: 45000, method: 'POST', body: JSON.stringify({ message, fixture_id: fixture.id, competition_id: fixture.competition_id, fixture_date: fixture.kickoff_date || fixture.kickoff?.slice(0,10) }) });
+export const askAnalyst = (message, fixture, analysis) => request('/api/chat', { timeoutMs: 45000, method: 'POST', body: JSON.stringify({ message, fixture, fixture_id: fixture.id, competition_id: fixture.competition_id, fixture_date: fixture.kickoff_date || fixture.kickoff?.slice(0,10) }) });
 export const getPredictions = () => request('/api/predictions?limit=10');
 export const getRecommendations = (from, to, competition, limit = 20) => {
   const p = new URLSearchParams({ date_from: from, date_to: to, limit: String(limit) });
