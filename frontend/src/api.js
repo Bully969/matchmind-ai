@@ -6,6 +6,22 @@ export const isApiConfigured = import.meta.env.PROD || Boolean(API);
 export const apiBaseUrl = API;
 
 async function request(path, options = {}) {
+  try {
+    return await requestOnce(path, options);
+  } catch (error) {
+    // A sleeping backend can outlast the first request. Never repeat writes.
+    if ((options.method || 'GET') === 'GET' && error.retryable) {
+      return requestOnce(path, options);
+    }
+    throw error;
+  }
+}
+
+function temporaryError(message) {
+  return Object.assign(new Error(message), {retryable: true});
+}
+
+async function requestOnce(path, options = {}) {
   if (!isApiConfigured) {
     const error = new Error('API non configurata in produzione. Imposta VITE_API_URL con l’origine pubblica del backend FastAPI e ridistribuisci il frontend.');
     error.code = 'API_NOT_CONFIGURED';
@@ -21,6 +37,9 @@ async function request(path, options = {}) {
       signal: controller.signal,
       headers: {'Content-Type': 'application/json', ...(options.headers || {})},
     });
+    if ([502,503,504].includes(response.status)) {
+      throw temporaryError(`Backend temporaneamente non disponibile (${response.status}). Riprova tra poco.`);
+    }
     let payload;
     try { payload = await response.json(); }
     catch (error) {
@@ -33,8 +52,8 @@ async function request(path, options = {}) {
     }
     return payload;
   } catch (error) {
-    if (controller.signal.aborted) throw new Error(`Il backend non ha risposto entro ${timeoutMs / 1000} secondi. Potrebbe essere in avvio: riprova tra poco.`);
-    if (error instanceof TypeError) throw new Error(`Impossibile raggiungere il backend ${API}. Verifica la connessione e riprova.`);
+    if (controller.signal.aborted) throw temporaryError(`Il backend non ha risposto entro ${timeoutMs / 1000} secondi. Potrebbe essere in avvio: riprova tra poco.`);
+    if (error instanceof TypeError) throw temporaryError(`Impossibile raggiungere il backend ${API}. Verifica la connessione e riprova.`);
     throw error;
   } finally {
     window.clearTimeout(timeout);

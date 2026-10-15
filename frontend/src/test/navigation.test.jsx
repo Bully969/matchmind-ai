@@ -21,7 +21,8 @@ async function ready() {render(<App/>);await waitFor(()=>expect(screen.queryByRo
 test('settings renders provider status without crashing',async()=>{
   await ready();await userEvent.click(screen.getByRole('button',{name:/⚙.*Impostazioni/}));
   expect(screen.getByRole('heading',{name:'Impostazioni',level:1})).toBeVisible();
-  expect(screen.getByText('Motore AI: template')).toBeVisible();
+  expect(screen.getByText('Motore AI: Non verificato')).toBeVisible();
+  expect(screen.getByText('Provider dichiarato dal backend: template')).toBeVisible();
 });
 test('live unavailable page navigates back to calendar',async()=>{
   await ready();const nav=within(screen.getByRole('navigation',{name:'Navigazione principale'}));

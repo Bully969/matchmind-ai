@@ -17,7 +17,7 @@ test('slow request aborts and can be retried',async()=>{
   vi.useFakeTimers();
   vi.stubGlobal('fetch',vi.fn((_,{signal})=>new Promise((_,reject)=>signal.addEventListener('abort',()=>reject(new DOMException('aborted','AbortError'))))));
   const result=expect(getHealth()).rejects.toThrow('30 secondi');
-  await vi.advanceTimersByTimeAsync(30000);await result;
+  await vi.advanceTimersByTimeAsync(60000);await result;
   fetch.mockResolvedValue({ok:true,json:async()=>({status:'ok'})});
   await expect(getHealth()).resolves.toEqual({status:'ok'});
 });
@@ -40,4 +40,18 @@ test('regression: hosted requests stay same-origin despite an old VITE_API_URL',
     await hosted.getHealth();
     expect(fetch.mock.calls[0][0]).toBe('/api/health');
   } finally {vi.unstubAllEnvs();vi.resetModules();}
+});
+
+
+test('temporary gateway failure retries a read once',async()=>{
+  vi.stubGlobal('fetch',vi.fn()
+    .mockResolvedValueOnce({ok:false,status:503,json:async()=>({detail:'starting'})})
+    .mockResolvedValueOnce({ok:true,status:200,json:async()=>({status:'ok'})}));
+  await expect(getHealth()).resolves.toEqual({status:'ok'});
+  expect(fetch).toHaveBeenCalledTimes(2);
+});
+test('failed chat POST is never retried',async()=>{
+  vi.stubGlobal('fetch',vi.fn().mockRejectedValue(new TypeError('offline')));
+  await expect(askAnalyst('Fonte?',{id:'test'})).rejects.toThrow();
+  expect(fetch).toHaveBeenCalledTimes(1);
 });

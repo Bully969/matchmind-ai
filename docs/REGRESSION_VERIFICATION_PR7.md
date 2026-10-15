@@ -68,3 +68,13 @@ Non effettuati merge, promozioni Vercel, deploy Render o migrazioni. La produzio
 La correzione è isolata in un commit applicativo con padre `78eab898420aa48472d9bf660e115931c0528c40`. Un revert del commit `60f3431d62793d526eca78280ab771deef8c0319` su un branch di prova ripristina esattamente l'albero della PR7 (salvo documentazione successiva). È un percorso di rollback del codice, non un ripristino operativo che consigliamo: la preview PR7 ha i guasti descritti.
 
 Per un eventuale rilascio futuro conservare come rollback di produzione il deployment `dpl_6quSnzRX24gGV5VrjUTd5BptuE2K`, senza ricostruire dipendenze. Verificare prima la possibilità di ripromuoverlo nel progetto Vercel. **Nessuna promozione/rollback reale è stata eseguita o certificata**. Prima del merge chiudere i gate sopra, collaudare la coppia frontend/backend destinata alla produzione e registrare entrambi gli SHA.
+
+## Aggiornamento dopo conferma workspace Render
+
+Il servizio corretto è `srv-db7ptaqvcj2c73eh25g0` (`backend/`, piano free), deployment live `dep-db7tua49v7es73dn3ppg`, commit **2fff9ae2cce21004eff4b1a3f1b0ce7419fbfb59**. Frontend e backend di produzione sono quindi identificati entrambi. Nessun deploy effettuato.
+
+I log 15 ottobre 01:18 UTC mostrano avvio uvicorn alle 01:18:17, startup completato alle 01:18:37 e health 200 dalle 01:18:39, poi competizioni/partite/archivio 200. Questo conferma un avvio del servizio durante il caricamento iniziale. Aggiunto un unico retry per GET su timeout, errore di rete o 502/503/504. Nessun retry dei POST, nessun ciclo infinito. Test 503 fallito prima del fix e passato dopo; timeout e POST verificati. Test frontend: 21/21, build passata.
+
+Impostazioni distingue ora provider dichiarato e motore verificato: il campo legacy `gemini` non viene più presentato da solo come motore attivo.
+
+Aggiunta suite Playwright in CI con Chromium desktop e WebKit emulazione iPhone, dati sintetici confinati ai test e report HTML. Comprende navigazione, menu mobile, controllo overflow, selezione/refresh, orario sconosciuto, errore API/riprova, filtri/stato vuoto e reload. Risultati da registrare dopo l'esecuzione: la sola aggiunta dei file non costituisce un test superato. WebKit emulato non equivale a un iPhone fisico.
