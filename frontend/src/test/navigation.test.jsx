@@ -21,7 +21,8 @@ async function ready() {render(<App/>);await waitFor(()=>expect(screen.queryByRo
 test('settings renders provider status without crashing',async()=>{
   await ready();await userEvent.click(screen.getByRole('button',{name:/⚙.*Impostazioni/}));
   expect(screen.getByRole('heading',{name:'Impostazioni',level:1})).toBeVisible();
-  expect(screen.getByText('Motore AI: template')).toBeVisible();
+  expect(screen.getByText('Motore AI: Non verificato')).toBeVisible();
+  expect(screen.getByText('Provider dichiarato dal backend: template')).toBeVisible();
 });
 test('live unavailable page navigates back to calendar',async()=>{
   await ready();const nav=within(screen.getByRole('navigation',{name:'Navigazione principale'}));
@@ -74,7 +75,26 @@ test('late chat answer is discarded when the selected context changes',async()=>
   let resolveAnswer;api.askAnalyst.mockReturnValueOnce(new Promise(resolve=>{resolveAnswer=resolve;}));
   await ready();await userEvent.click(screen.getByRole('button',{name:/Invia domanda/}));
   expect(api.askAnalyst).toHaveBeenCalled();
+  await userEvent.click(screen.getByRole('button',{name:/Domani/}));
+  api.getFixtures.mockResolvedValueOnce({items:[]});
   await userEvent.click(screen.getByRole('button',{name:/Aggiorna connessione/}));
   await act(async()=>resolveAnswer({answer:'OLD CONTEXT ANSWER',provider:'template'}));
   expect(screen.queryByText(/OLD CONTEXT ANSWER/)).not.toBeInTheDocument();
+});
+
+test('regression: initial calendar preserves the seven-day window',async()=>{
+  await ready();
+  const [from,to]=api.getFixtures.mock.calls[0];
+  const days=(new Date(`${to}T12:00:00Z`)-new Date(`${from}T12:00:00Z`))/86400000;
+  expect(days).toBe(7);
+});
+test('regression: refreshing keeps the selected second match',async()=>{
+  const second={...fixture,id:'second',home_team:'Second Home',away_team:'Second Away'};
+  api.getFixtures.mockResolvedValue({items:[fixture,second]});
+  await ready();
+  await userEvent.click(screen.getByRole('button',{name:/Test League.*Second Home.*Second Away/}));
+  expect(screen.getByRole('heading',{name:'Second Home'})).toBeVisible();
+  await userEvent.click(screen.getByRole('button',{name:/Aggiorna connessione/}));
+  await waitFor(()=>expect(screen.queryByRole('status')).not.toBeInTheDocument());
+  expect(screen.getByRole('heading',{name:'Second Home'})).toBeVisible();
 });
