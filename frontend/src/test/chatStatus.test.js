@@ -12,3 +12,11 @@ test('unknown server error details are not echoed',()=>{
 test('successful generation is not labelled fallback',()=>{
   expect(formatChatAnswer({answer:'Risposta',provider:'openai_compatible',fallback:false})).toBe('Risposta\n\nMotore: openai_compatible');
 });
+
+test('quota failures explain why repeated requests cannot recover',()=>{
+  for (const reason of ['CREDIT_EXHAUSTED','QUOTA_EXHAUSTED']) {
+    const answer = formatChatAnswer({answer:'Sintesi',provider:'template',fallback:true,fallback_reason:reason});
+    expect(answer).toContain('ripetere la richiesta non risolve il blocco');
+    expect(answer).toContain('risposta di riserva');
+  }
+});

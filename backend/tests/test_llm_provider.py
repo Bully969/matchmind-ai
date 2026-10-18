@@ -60,3 +60,21 @@ def test_invalid_configuration_does_not_call_provider(provider, monkeypatch, bas
         pytest.fail('Invalid configuration must not call the provider')
     transport(monkeypatch, forbidden)
     assert ask()['fallback_reason'] == reason
+
+
+@pytest.mark.parametrize('error,reason', [
+    ({'code':'credit_balance_exhausted','type':'insufficient_quota'}, 'CREDIT_EXHAUSTED'),
+    ({'code':'insufficient_quota'}, 'QUOTA_EXHAUSTED'),
+    ({'type':'insufficient_quota'}, 'QUOTA_EXHAUSTED'),
+    ({'code':'rate_limit_exceeded'}, 'RATE_LIMITED'),
+    ({'code': ['unexpected']}, 'RATE_LIMITED'),
+    ('malformed', 'RATE_LIMITED'),
+])
+def test_quota_diagnostics_without_sensitive_provider_message(provider, monkeypatch, error, reason):
+    if isinstance(error, dict):
+        error['message'] = 'test-secret private billing details'
+    transport(monkeypatch, lambda request: httpx.Response(429, json={'error': error}))
+    result = ask()
+    assert result['fallback_reason'] == reason
+    assert 'test-secret' not in json.dumps(result)
+    assert 'private billing' not in json.dumps(result)

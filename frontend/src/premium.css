@@ -144,3 +144,28 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 @media (prefers-reduced-motion: reduce) {
   button, input, select, textarea, .kpi-card { transition: none !important; }
 }
+
+/* Mobile reading and touch targets: keep football content usable without zoom. */
+@media (max-width: 700px) {
+  .global-search { min-width: 0; min-height: 44px; }
+  .global-search input, .calendar-filters input, .calendar-filters select,
+  .analyst-chat-form textarea { font-size: 16px; }
+  .calendar-filters input, .calendar-filters select { width: 100%; min-width: 0; min-height: 44px; }
+  .calendar-filters label { font-size: 13px; }
+  .calendar-filters .button, .date-switcher button, .match-tabs button,
+  .analyst-chat-form .button, .mobile-more-menu button { min-height: 44px; }
+  .match-tabs button { font-size: 12px; flex-shrink: 0; }
+  .calendar-fixture { padding: 12px 6px; min-height: 64px; }
+  .calendar-time { font-size: 11px; line-height: 1.5; }
+  .calendar-team { font-size: 13px; line-height: 1.4; overflow-wrap: anywhere; }
+  .calendar-team b { display: block; -webkit-line-clamp: unset; overflow: visible; }
+  .calendar-score { font-size: 13px; }
+  .data-unavailable strong { font-size: 14px; }
+  .data-unavailable small, .body-muted, .source-note, .table-caveat,
+  .analyst-answer p, .page-heading p:not(.eyebrow) { font-size: 13px; line-height: 1.65; }
+  .analyst-answer { overflow-wrap: anywhere; }
+  .analyst-answer strong, .mobile-more-menu>button { font-size: 14px; }
+  .mobile-nav button small { font-size: 10px; }
+  .mobile-more-menu { max-height: calc(100dvh - 150px - env(safe-area-inset-bottom)); overflow-y: auto; }
+  .main-content { padding-bottom: calc(100px + env(safe-area-inset-bottom)); }
+}
