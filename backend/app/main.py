@@ -15,7 +15,8 @@ from .models import Prediction
 from .schemas import AnalyzeRequest, ChatRequest
 from .providers.factory import get_provider
 from .services.predictor import analyse_matches, MODEL_VERSION
-from .services.llm import explain
+from .services.llm import explain, provider_status
+from .services.match_context import verified_match_context
 from .services.recommendations import rank_market_candidates
 
 limiter=Limiter(key_func=get_remote_address)
@@ -43,7 +44,8 @@ async def health():
         provider_error = type(exc).__name__
     return {"status":"ok","app":settings.app_name,"version":"0.1.0","data_provider":data_provider,
             "configured_data_provider":settings.data_provider,"is_demo":is_demo,
-            "provider_error":provider_error,"ai_provider":settings.ai_provider,"model_version":MODEL_VERSION,
+            "provider_error":provider_error,"ai_provider":provider_status()["effective"],
+            "ai_status":provider_status(),"model_version":MODEL_VERSION,
             "note":"Health check confirms application response, not data freshness or predictive accuracy."}
 
 @app.get("/api/providers")
@@ -53,7 +55,7 @@ async def providers():
     except Exception:
         active_data_provider = "unavailable"
     return {"data_provider":active_data_provider,"configured_data_provider":settings.data_provider,
-            "ai_provider":settings.ai_provider,"providers":[
+            "ai_provider":provider_status()["effective"],"ai_status":provider_status(),"providers":[
         {"id":"openfootball_remote","label":"OpenFootball pubblico CC0","limits":"8 competizioni della stagione 2026/27; calendari e risultati pubblicati; non live; nessuna quota, xG, formazione o infortunio"},
         {"id":"openfootball","label":"OpenFootball locale","limits":"Dataset sincronizzati manualmente in backend/data; copertura dipendente dai file presenti"},
         {"id":"football_data_org","label":"Football-Data.org","limits":"Richiede API key; piano gratuito limitato a 12 competizioni e dati ritardati"},
@@ -67,9 +69,10 @@ async def competitions(request: Request):
     try:
         provider=get_provider()
         data=await provider.competitions()
-        return {"items":data,"count":len(data),"source":provider.name,"is_demo":provider.is_demo,"retrieved_at":datetime.now(timezone.utc).isoformat()}
+        return {"items":data,"count":len(data),"source":provider.name,"is_demo":provider.is_demo,"retrieved_at":datetime.now(timezone.utc).isoformat(),
+                "data_status":provider.data_status() if hasattr(provider, "data_status") else {"source_updated_at":None,"coverage":"UNVERIFIED"}}
     except Exception as exc:
-        raise HTTPException(status_code=502,detail=f"Errore fonte dati: {type(exc).__name__}: {str(exc)[:300]}")
+        raise HTTPException(status_code=502,detail="Fonte dati temporaneamente non disponibile. Riprova tra poco.")
 
 @app.get("/api/fixtures")
 @limiter.limit("30/minute")
@@ -81,9 +84,10 @@ async def fixtures(request: Request, date_from: date|None=None, date_to: date|No
     try:
         provider=get_provider()
         items=await provider.fixtures(start,end,competition_id)
-        return {"items":items,"count":len(items),"source":provider.name,"is_demo":provider.is_demo,"retrieved_at":datetime.now(timezone.utc).isoformat(),"date_from":start,"date_to":end}
+        return {"items":items,"count":len(items),"source":provider.name,"is_demo":provider.is_demo,"retrieved_at":datetime.now(timezone.utc).isoformat(),"date_from":start,"date_to":end,
+                "data_status":provider.data_status(competition_id) if hasattr(provider, "data_status") else {"source_updated_at":None,"coverage":"UNVERIFIED"}}
     except Exception as exc:
-        raise HTTPException(status_code=502,detail=f"Errore fonte dati: {type(exc).__name__}: {str(exc)[:300]}")
+        raise HTTPException(status_code=502,detail="Fonte dati temporaneamente non disponibile. Riprova tra poco.")
 
 @app.get("/api/recommendations")
 @limiter.limit("8/minute")
@@ -231,7 +235,14 @@ async def analyze(request: Request, body: AnalyzeRequest, db: Session=Depends(ge
 @app.post("/api/chat")
 @limiter.limit("15/minute")
 async def chat(request: Request, body: ChatRequest):
-    result=await explain(body.message,body.fixture,body.analysis)
+    try:
+        provider = get_provider()
+    except Exception:
+        raise HTTPException(status_code=503, detail="Fonte dati non configurata correttamente.")
+    fixture = await verified_match_context(provider, body)
+    # Client-supplied analysis, scores and team names are intentionally ignored.
+    result = await explain(body.message, fixture, None)
+    result["context"] = {"fixture_id": fixture["id"], "source": fixture["source"], "verified_at": fixture["verified_at"]}
     return result
 
 @app.get("/api/predictions")

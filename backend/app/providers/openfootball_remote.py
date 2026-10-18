@@ -6,7 +6,7 @@ sports feed. The in-process cache reduces requests and respects the source's dai
 """
 import asyncio
 import time as clock
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timezone
 from typing import Any
 from zoneinfo import ZoneInfo
 
@@ -42,6 +42,16 @@ class OpenFootballRemoteProvider(DataProvider):
         self.cache_ttl = cache_ttl
         self._cache: dict[str, tuple[float, dict[str, Any] | None]] = {}
         self._locks: dict[str, asyncio.Lock] = {}
+        self._fetch_status: dict[str, dict[str, Any]] = {}
+
+    def data_status(self, competition_id: str | None = None) -> dict[str, Any]:
+        configs = [COMPETITIONS[competition_id]] if competition_id in COMPETITIONS else list(COMPETITIONS.values())
+        paths = [config["current"] for config in configs]
+        datasets = [{"path": path, **self._fetch_status.get(path, {"status": "NOT_FETCHED", "fetched_at": None})} for path in paths]
+        return {"coverage": "COMPLETE" if all(item["status"] == "AVAILABLE" for item in datasets) else "PARTIAL",
+                "source_updated_at": None, "is_live": False, "cache_ttl_seconds": self.cache_ttl,
+                "timestamp_note": "retrieved_at è l'ora della risposta API; fetched_at è il download del dataset. L'aggiornamento editoriale della fonte non è noto.",
+                "datasets": datasets}
 
     async def _dataset(self, path: str) -> dict[str, Any] | None:
         now = clock.monotonic()
@@ -56,15 +66,20 @@ class OpenFootballRemoteProvider(DataProvider):
             if cached and cached[0] > now:
                 return cached[1]
 
-            async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
-                response = await client.get(f"{BASE_URL}/{path}", headers={"User-Agent": "MatchMind-AI/0.1"})
-            if response.status_code == 404:
-                data = None
-            else:
-                response.raise_for_status()
-                data = response.json()
-                if not isinstance(data, dict) or not isinstance(data.get("matches"), list):
-                    raise RuntimeError(f"Dataset OpenFootball non valido: {path}")
+            try:
+                async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
+                    response = await client.get(f"{BASE_URL}/{path}", headers={"User-Agent": "MatchMind-AI/0.1"})
+                if response.status_code == 404:
+                    data = None
+                else:
+                    response.raise_for_status()
+                    data = response.json()
+                    if not isinstance(data, dict) or not isinstance(data.get("matches"), list):
+                        raise RuntimeError(f"Dataset OpenFootball non valido: {path}")
+            except Exception:
+                self._fetch_status[path] = {"status": "UNAVAILABLE", "fetched_at": None}
+                raise
+            self._fetch_status[path] = {"status": "AVAILABLE" if data is not None else "NOT_FOUND", "fetched_at": datetime.now(timezone.utc).isoformat()}
             self._cache[path] = (clock.monotonic() + self.cache_ttl, data)
             return data
 
@@ -134,6 +149,7 @@ class OpenFootballRemoteProvider(DataProvider):
             "country": competition["country"],
             "season": season,
             "kickoff": kickoff,
+            "kickoff_date": match_date.isoformat(),
             "kickoff_time_known": time_known,
             "status": status,
             "home_team": home,
