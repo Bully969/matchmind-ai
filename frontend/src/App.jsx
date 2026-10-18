@@ -1,3 +1,4 @@
+import { formatChatAnswer } from './chatStatus';
 import { formatFixtureDate } from './dates';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { analyzeMatch, askAnalyst, getCompetitions, getFixtures, getHealth, getPredictions, getRecommendations, isApiConfigured } from './api';
@@ -216,7 +217,7 @@ export default function App() {
       if (!connected) throw new Error('Backend non raggiungibile');
       const result = await askAnalyst(question, selected);
       if (context !== contextSequence.current) return;
-      setAnswer(`${result.answer}\n\nMotore: ${result.provider}${result.fallback ? ' · risposta di riserva' : ''}`);
+      setAnswer(formatChatAnswer(result));
     } catch(e) {
       if (context === contextSequence.current) setAnswer(`Contesto non disponibile: ${e.message || 'servizio non raggiungibile'}. Riprova tra poco.`);
     } finally {

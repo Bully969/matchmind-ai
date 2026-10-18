@@ -52,3 +52,18 @@ test('API outage, retry, empty results and reload',async({page,isMobile})=>{
   await expect(page.getByText('Nessuna partita nell’intervallo selezionato')).toBeVisible();
   empty=false;await page.reload();await expect(page.getByRole('heading',{name:'Alpha Test',exact:true})).toBeVisible();
 });
+test('chat labels provider failures and subsequent successful response',async({page})=>{
+  let fallback=true;
+  await page.route('**/api/chat',route=>route.fulfill({json:fallback
+    ? {answer:'Sintesi dei dati verificati.',provider:'template',fallback:true,fallback_reason:'AUTHENTICATION_FAILED'}
+    : {answer:'La fonte è test.',provider:'openai_compatible',fallback:false}}));
+  await page.goto('/');
+  await expect(page.getByRole('heading',{name:'Alpha Test',exact:true})).toBeVisible();
+  await page.getByPlaceholder('Fai una domanda sulla partita selezionata…').fill('Qual è la fonte?');
+  await page.getByRole('button',{name:'Invia domanda ↗'}).click();
+  await expect(page.locator('.analyst-answer')).toContainText('Autenticazione del provider AI non riuscita.');
+  fallback=false;
+  await page.getByRole('button',{name:'Invia domanda ↗'}).click();
+  await expect(page.locator('.analyst-answer')).toContainText('Motore: openai_compatible');
+  await expect(page.locator('.analyst-answer')).not.toContainText('risposta di riserva');
+});

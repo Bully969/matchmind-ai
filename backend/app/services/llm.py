@@ -1,5 +1,6 @@
 import json
 import httpx
+from urllib.parse import urlparse
 from ..config import settings
 
 def provider_status() -> dict:
@@ -10,6 +11,13 @@ def provider_status() -> dict:
     if configured not in {"ollama", "openai_compatible"}:
         return {"configured": configured, "effective": "template", "status": "UNSUPPORTED_PROVIDER", "model_verified": False}
     valid = (settings.ollama_base_url and settings.ollama_model) if configured == "ollama" else (settings.openai_compatible_base_url and settings.openai_compatible_model)
+    if configured == "openai_compatible":
+        host = urlparse(settings.openai_compatible_base_url).hostname
+        model = settings.openai_compatible_model.strip()
+        if host == "generativelanguage.googleapis.com" and not model.startswith("gemini-"):
+            return {"configured": configured, "effective": "template", "status": "MODEL_PROVIDER_MISMATCH", "model_verified": False}
+        if host == "api.openai.com" and not settings.openai_compatible_api_key:
+            valid = False
     return {"configured": configured, "effective": configured if valid else "template",
             "status": "NOT_VERIFIED" if valid else "MISSING_CONFIGURATION", "model_verified": False}
 
@@ -64,17 +72,25 @@ async def explain(message: str, fixture: dict, analysis: dict | None) -> dict:
             headers={"Content-Type":"application/json"}
             if settings.openai_compatible_api_key:
                 headers["Authorization"]="Bearer "+settings.openai_compatible_api_key
+            model = settings.openai_compatible_model.strip()
+            payload = {"model": model, "messages":[{"role":"system","content":SYSTEM_PROMPT},{"role":"user","content":json.dumps(context, ensure_ascii=False, default=str)}]}
+            # This is a short factual explanation, not a reasoning/market task.
+            # Avoid optional sampling parameters that some reasoning models reject.
+            if urlparse(settings.openai_compatible_base_url).hostname == "api.openai.com" and model.startswith("gpt-6"):
+                payload.update(reasoning_effort="none", max_completion_tokens=1200)
             async with httpx.AsyncClient(timeout=20) as client:
-                resp=await client.post(settings.openai_compatible_base_url.rstrip("/")+"/chat/completions",headers=headers,json={
-                    "model":settings.openai_compatible_model,
-                    "messages":[{"role":"system","content":SYSTEM_PROMPT},{"role":"user","content":json.dumps(context, ensure_ascii=False, default=str)}],"temperature":0.2
-                })
+                resp=await client.post(settings.openai_compatible_base_url.rstrip("/")+"/chat/completions",headers=headers,json=payload)
                 resp.raise_for_status(); data=resp.json()
-            answer=data.get("choices",[{}])[0].get("message",{}).get("content","").strip()
+            choices = data.get("choices") or []
+            content = ((choices[0].get("message") or {}).get("content") if choices else None)
+            answer = content.strip() if isinstance(content, str) else ""
             if answer:
                 return {"answer":answer,"provider":"openai_compatible","fallback":False}
         except httpx.TimeoutException:
             fallback_reason = "TIMEOUT"
+        except httpx.HTTPStatusError as exc:
+            # Never expose provider response bodies, keys, URLs or account details.
+            fallback_reason = {401:"AUTHENTICATION_FAILED",403:"ACCESS_DENIED",404:"MODEL_NOT_FOUND",429:"RATE_LIMITED",400:"INVALID_REQUEST"}.get(exc.response.status_code,"MODEL_UNAVAILABLE")
         except Exception:
             fallback_reason = "MODEL_UNAVAILABLE"
     return {"answer":template_explanation(message,fixture,analysis),"provider":"template","fallback":state["configured"]!="template", "fallback_reason":fallback_reason or ("EMPTY_RESPONSE" if provider != "template" else None)}
