@@ -3,6 +3,8 @@ const reasons = {
   ACCESS_DENIED: 'Accesso al modello non consentito dal provider.',
   MODEL_NOT_FOUND: 'Modello non disponibile per questa configurazione.',
   RATE_LIMITED: 'Limite di richieste o quota del provider raggiunto.',
+  CREDIT_EXHAUSTED: 'Credito API esaurito. Verifica il saldo del progetto presso il provider; ripetere la richiesta non risolve il blocco.',
+  QUOTA_EXHAUSTED: 'Quota API non disponibile. Verifica credito e limiti del progetto presso il provider; ripetere la richiesta non risolve il blocco.',
   INVALID_REQUEST: 'Il provider ha rifiutato la richiesta al modello.',
   MODEL_PROVIDER_MISMATCH: 'Modello e provider configurati non compatibili.',
   MISSING_CONFIGURATION: 'Configurazione AI incompleta.',

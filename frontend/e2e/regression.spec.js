@@ -67,3 +67,18 @@ test('chat labels provider failures and subsequent successful response',async({p
   await expect(page.locator('.analyst-answer')).toContainText('Motore: openai_compatible');
   await expect(page.locator('.analyst-answer')).not.toContainText('risposta di riserva');
 });
+
+test('mobile calendar and chat have readable fields and touch targets',async({page,isMobile})=>{
+  test.skip(!isMobile, 'Mobile-specific typography and touch contract');
+  await page.goto('/');
+  await expect(page.getByRole('heading',{name:'Alpha Test',exact:true})).toBeVisible();
+  for (const locator of [page.locator('.global-search input'),page.locator('.analyst-chat-form textarea')]) {
+    expect(await locator.evaluate(el=>parseFloat(getComputedStyle(el).fontSize))).toBeGreaterThanOrEqual(16);
+  }
+  await navigate(page,'Calendario',isMobile);
+  for (const locator of [page.getByLabel('Dal',{exact:true}),page.getByLabel('Al',{exact:true}),page.getByLabel('Campionato',{exact:true})]) {
+    expect(await locator.evaluate(el=>parseFloat(getComputedStyle(el).fontSize))).toBeGreaterThanOrEqual(16);
+    expect((await locator.boundingBox()).height).toBeGreaterThanOrEqual(44);
+  }
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
+});
